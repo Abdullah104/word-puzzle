@@ -43,7 +43,7 @@ final class SizeProvider extends $NotifierProvider<Size, CrosswordSize> {
   }
 }
 
-String _$sizeHash() => r'6ac1fd849e95fb2530e027e6a902b24ed810647c';
+String _$sizeHash() => r'6b64e8adc8bb63300b82704ae65ac64005ae351a';
 
 /// A provider that holds the current size of the crossword to generate.
 

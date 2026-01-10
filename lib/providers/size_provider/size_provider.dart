@@ -20,7 +20,7 @@ enum CrosswordSize {
 /// A provider that holds the current size of the crossword to generate.
 @Riverpod(keepAlive: true)
 class Size extends _$Size {
-  CrosswordSize _size = .medium;
+  CrosswordSize _size = .large;
 
   @override
   CrosswordSize build() => _size;

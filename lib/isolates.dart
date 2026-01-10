@@ -1,9 +1,11 @@
 import 'dart:math';
 
 import 'package:built_collection/built_collection.dart';
+import 'package:characters/characters.dart';
 import 'package:flutter/foundation.dart';
 import 'package:word_puzzle/models/crossword/crossword.dart';
 import 'package:word_puzzle/models/location/location.dart';
+import 'package:word_puzzle/models/work_queue/work_queue.dart';
 import 'package:word_puzzle/utils.dart';
 
 import 'models/direction.dart';
@@ -14,34 +16,73 @@ Stream<Crossword> exploreCrosswordSolutions({
   required Crossword crossword,
   required BuiltSet<String> wordList,
 }) async* {
-  while (crossword.characters.length <
-      crossword.width * crossword.height * .8) {
-    final word = wordList.randomElement();
-    final Direction direction = _random.nextBool() ? .across : .down;
+  final start = DateTime.now();
 
-    final location = Location.at(
-      _random.nextInt(crossword.width),
-      _random.nextInt(crossword.height),
-    );
+  var workQueue = WorkQueue.from(
+    crossword: crossword,
+    candidateWords: wordList,
+    startLocation: Location.at(0, 0),
+  );
+
+  while (!workQueue.isCompleted) {
+    final location = workQueue.locationsToTry.keys.toBuiltSet().randomElement();
 
     try {
-      var candidate = await compute(((String, Direction, Location) wordToAdd) {
-        final (word, direction, location) = wordToAdd;
+      final crossword = await compute(((WorkQueue, Location) workMessage) {
+        final (workQueue, location) = workMessage;
+        final direction = workQueue.locationsToTry[location]!;
+        final target = workQueue.crossword.characters[location];
+        if (target == null) {
+          return workQueue.crossword.addWord(
+            location: location,
+            word: workQueue.candidateWords.randomElement(),
+            direction: direction,
+          );
+        }
 
-        return crossword.addWord(
-          location: location,
-          word: word,
-          direction: direction,
+        var words = workQueue.candidateWords.toBuiltList().rebuild(
+          (b) => b
+            ..where((b) => b.characters.contains(target.character))
+            ..shuffle(),
         );
-      }, (word, direction, location));
 
-      if (candidate != null) {
-        crossword = candidate;
+        var tryCount = 0;
+
+        for (final word in words) {
+          tryCount++;
+
+          for (final (index, character) in word.characters.indexed) {
+            if (character != target.character) continue;
+
+            final candidate = workQueue.crossword.addWord(
+              location: switch (direction) {
+                .across => location.leftOffset(index),
+                .down => location.upOffset(index),
+              },
+              word: word,
+              direction: direction,
+            );
+            if (candidate != null) return candidate;
+          }
+
+          if (tryCount > 1000) break;
+        }
+      }, (workQueue, location));
+
+      if (crossword != null) {
+        workQueue = workQueue.updateFrom(crossword);
 
         yield crossword;
+      } else {
+        workQueue = workQueue.remove(location);
       }
     } catch (e) {
       debugPrint('Error running isolate: $e');
     }
+
+    debugPrint(
+      '${crossword.width} x ${crossword.height} Crossword generated in '
+      '${DateTime.now().difference(start).formatted}',
+    );
   }
 }
